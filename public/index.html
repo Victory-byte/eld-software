@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXIT LIQUIDITY DETECTOR</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #ff2e2e;
+    --green: #00ff88;
+    --amber: #ffaa00;
+    --blue: #00aaff;
+    --bg: #030303;
+    --glass: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.07);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.18;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeDown 0.8s ease both;
+  }
+
+  .header .eyebrow {
+    font-size: 0.65rem;
+    letter-spacing: 0.4em;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+  }
+
+  .header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.8rem, 7vw, 6rem);
+    letter-spacing: 0.06em;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 30%, rgba(255,255,255,0.35));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header .sub {
+    margin-top: 0.8rem;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .input-zone {
+    width: 100%;
+    max-width: 640px;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .glow-ring {
+    position: absolute;
+    inset: -1px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(255,46,46,0.5), rgba(0,170,255,0.3), rgba(0,255,136,0.3));
+    opacity: 0;
+    transition: opacity 0.4s;
+    z-index: -1;
+    filter: blur(8px);
+  }
+
+  .input-wrapper:focus-within .glow-ring { opacity: 1; }
+
+  #token-input {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.1rem 5.5rem 1.1rem 1.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.88rem;
+    color: #fff;
+    outline: none;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.3s, background 0.3s;
+  }
+
+  #token-input::placeholder { color: rgba(255,255,255,0.2); font-size: 0.78rem; }
+  #token-input:focus { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); }
+
+  #scan-btn {
+    position: absolute;
+    right: 0.5rem;
+    background: linear-gradient(135deg, var(--red), #cc0022);
+    border: none;
+    border-radius: 4px;
+    padding: 0.6rem 1.1rem;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: crosshair;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 20px rgba(255,46,46,0.3);
+    white-space: nowrap;
+  }
+
+  #scan-btn:hover { transform: scale(1.04); box-shadow: 0 0 30px rgba(255,46,46,0.5); }
+  #scan-btn:active { transform: scale(0.97); }
+  #scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  #scanning {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
+    margin-top: 3rem;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .scan-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.35em;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+  }
+
+  .scan-bars {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 32px;
+  }
+
+  .scan-bars span {
+    width: 3px;
+    background: var(--red);
+    border-radius: 2px;
+    animation: barPulse 0.8s ease-in-out infinite;
+  }
+
+  .scan-bars span:nth-child(1){animation-delay:0s}
+  .scan-bars span:nth-child(2){animation-delay:0.1s}
+  .scan-bars span:nth-child(3){animation-delay:0.2s}
+  .scan-bars span:nth-child(4){animation-delay:0.3s}
+  .scan-bars span:nth-child(5){animation-delay:0.4s}
+  .scan-bars span:nth-child(6){animation-delay:0.5s}
+  .scan-bars span:nth-child(7){animation-delay:0.6s}
+  .scan-bars span:nth-child(8){animation-delay:0.7s}
+
+  @keyframes barPulse {
+    0%,100% { height:6px; opacity:0.3; }
+    50% { height:32px; opacity:1; }
+  }
+
+  #result {
+    display: none;
+    width: 100%;
+    max-width: 640px;
+    margin-top: 2rem;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .verdict-block {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .verdict-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.4em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+  }
+
+  #verdict-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.2rem, 6vw, 4.5rem);
+    letter-spacing: 0.05em;
+    line-height: 1.05;
+    display: block;
+  }
+
+  .verdict-red   { color: var(--red);   text-shadow: 0 0 40px rgba(255,46,46,0.6); }
+  .verdict-green { color: var(--green); text-shadow: 0 0 40px rgba(0,255,136,0.5); }
+  .verdict-amber { color: var(--amber); text-shadow: 0 0 40px rgba(255,170,0,0.5); }
+  .verdict-blue  { color: var(--blue);  text-shadow: 0 0 40px rgba(0,170,255,0.5); }
+
+  @keyframes pulse-glow { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .pulsing { animation: pulse-glow 1.8s ease-in-out infinite; }
+
+  .confidence-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.2rem;
+  }
+
+  .confidence-ring { position: relative; width: 72px; height: 72px; }
+  .confidence-ring svg { transform: rotate(-90deg); }
+  .ring-bg { stroke: rgba(255,255,255,0.06); }
+  .ring-fill {
+    stroke-dasharray: 188;
+    stroke-dashoffset: 188;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1), stroke 0.5s;
+  }
+
+  .ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .conf-text {
+    font-size: 0.55rem;
+    letter-spacing: 0.25em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-card {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.4;
+  }
+
+  .stat-card .s-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .stat-card .s-value {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-card .s-sub {
+    font-size: 0.62rem;
+    color: rgba(255,255,255,0.35);
+    margin-top: 0.25rem;
+    line-height: 1.4;
+  }
+
+  .sim-block {
+    background: rgba(255,46,46,0.05);
+    border: 1px solid rgba(255,46,46,0.18);
+    border-radius: 6px;
+    padding: 1.2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .sim-header {
+    font-size: 0.55rem;
+    letter-spacing: 0.35em;
+    color: rgba(255,46,46,0.7);
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+  }
+
+  #sim-text {
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.75);
+  }
+
+  .tw-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: rgba(255,255,255,0.6);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 0.8s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  #share-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem;
+    color: rgba(255,255,255,0.5);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: crosshair;
+    transition: all 0.2s;
+    margin-top: 0.75rem;
+  }
+
+  #share-btn:hover { border-color: rgba(255,255,255,0.25); color:#fff; background:rgba(255,255,255,0.03); }
+
+  #toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.7rem 1.4rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 90vw;
+    text-align: center;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:none} }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)}  to{opacity:1;transform:none} }
+  @keyframes fadeIn   { from{opacity:0} to{opacity:1} }
+
+  #reset-btn {
+    display: none;
+    margin-top: 1.5rem;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.25);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: crosshair;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  #reset-btn:hover { color: rgba(255,255,255,0.5); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="app">
+  <div class="header">
+    <p class="eyebrow">⚠ ALPHA INTELLIGENCE SYSTEM</p>
+    <h1>EXIT LIQUIDITY<br>DETECTOR</h1>
+    <p class="sub">This AI doesn't analyze coins. It tells you if you're the victim.</p>
+  </div>
+
+  <div class="input-zone">
+    <div class="input-wrapper">
+      <div class="glow-ring"></div>
+      <input id="token-input" type="text" placeholder="Token address or ticker ($PEPE, 0x1234…)" autocomplete="off" spellcheck="false">
+      <button id="scan-btn">SCAN</button>
+    </div>
+  </div>
+
+  <div id="scanning">
+    <p class="scan-label">Scanning blockchain + analyzing you</p>
+    <div class="scan-bars">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div id="result">
+    <div class="verdict-block">
+      <p class="verdict-label">Your Role In This Trade</p>
+      <span id="verdict-text"></span>
+      <div class="confidence-wrap">
+        <div class="confidence-ring">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle class="ring-bg" cx="36" cy="36" r="30" fill="none" stroke-width="4"/>
+            <circle id="ring-fill" class="ring-fill" cx="36" cy="36" r="30" fill="none" stroke-width="4"/>
+          </svg>
+          <span class="ring-label" id="ring-pct">—</span>
+        </div>
+        <span class="conf-text">Confidence</span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card" id="card-role">
+        <p class="s-label">Role</p>
+        <p class="s-value" id="stat-role">—</p>
+        <p class="s-sub" id="stat-role-sub"></p>
+      </div>
+      <div class="stat-card" id="card-timing">
+        <p class="s-label">Chart Timing</p>
+        <p class="s-value" id="stat-timing">—</p>
+        <p class="s-sub" id="stat-timing-sub"></p>
+      </div>
+      <div class="stat-card" id="card-whale">
+        <p class="s-label">Whale Intent</p>
+        <p class="s-value" id="stat-whale">—</p>
+        <p class="s-sub" id="stat-whale-sub"></p>
+      </div>
+      <div class="stat-card" id="card-dev">
+        <p class="s-label">Dev History</p>
+        <p class="s-value" id="stat-dev">—</p>
+        <p class="s-sub" id="stat-dev-sub"></p>
+      </div>
+    </div>
+
+    <div class="sim-block">
+      <p class="sim-header">👉 If you ape now…</p>
+      <p id="sim-text"></p>
+    </div>
+
+    <button id="share-btn">⬡ Share This Result</button>
+  </div>
+
+  <button id="reset-btn">← Scan another token</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ══ Animated background ══ */
+(function(){
+  const canvas=document.getElementById('bg-canvas'), ctx=canvas.getContext('2d');
+  let W,H,lines=[];
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  function initLines(){
+    lines=[];
+    for(let i=0;i<12;i++) lines.push({
+      x:Math.random()*W,y:Math.random()*H,len:80+Math.random()*200,
+      amp:20+Math.random()*60,freq:0.005+Math.random()*0.01,
+      phase:Math.random()*Math.PI*2,
+      color:Math.random()>0.6?'#ff2e2e':(Math.random()>0.5?'#00ff88':'#00aaff'),
+      vx:(Math.random()-0.5)*0.4,vy:(Math.random()-0.5)*0.2
+    });
+  }
+  let t=0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);t+=0.008;
+    lines.forEach(l=>{
+      ctx.beginPath();
+      for(let i=0;i<l.len;i++){
+        const px=l.x+i,py=l.y+Math.sin(i*l.freq+t+l.phase)*l.amp;
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.strokeStyle=l.color;ctx.lineWidth=1;ctx.globalAlpha=0.35;ctx.stroke();
+      l.x+=l.vx;l.y+=l.vy;
+      if(l.x>W+100)l.x=-l.len;if(l.x<-l.len-100)l.x=W;
+      if(l.y>H+50)l.y=-50;if(l.y<-50)l.y=H+50;
+    });
+    requestAnimationFrame(draw);
+  }
+  resize();initLines();draw();
+  window.addEventListener('resize',()=>{resize();initLines();});
+})();
+
+/* ══ Typewriter ══ */
+function typewrite(el,text,speed=18){
+  return new Promise(resolve=>{
+    el.innerHTML='';
+    const cur=document.createElement('span');cur.className='tw-cursor';el.appendChild(cur);
+    let i=0;
+    const tick=()=>{
+      if(i<text.length){el.insertBefore(document.createTextNode(text[i++]),cur);setTimeout(tick,speed+Math.random()*20);}
+      else{cur.remove();resolve();}
+    };
+    tick();
+  });
+}
+
+/* ══ Ring ══ */
+function setRing(pct,color){
+  const fill=document.getElementById('ring-fill'),label=document.getElementById('ring-pct');
+  fill.style.stroke=color;fill.style.strokeDashoffset=188-(188*pct/100);
+  label.textContent=pct+'%';label.style.color=color;
+}
+
+/* ══ Color map ══ */
+function getRoleStyle(verdict){
+  const v=(verdict||'').toUpperCase();
+  if(/EXIT LIQUIDITY|LATE RETAIL/.test(v)) return{cls:'verdict-red',  ringColor:'var(--red)'};
+  if(/SMART MONEY|EARLY/.test(v))          return{cls:'verdict-green',ringColor:'var(--green)'};
+  if(/DEGEN/.test(v))                       return{cls:'verdict-amber',ringColor:'var(--amber)'};
+  return{cls:'verdict-amber',ringColor:'var(--amber)'};
+}
+
+/* ══ Elements ══ */
+const tokenInput=document.getElementById('token-input');
+const scanBtn   =document.getElementById('scan-btn');
+const scanningEl=document.getElementById('scanning');
+const resultEl  =document.getElementById('result');
+const resetBtn  =document.getElementById('reset-btn');
+let lastResult=null;
+
+scanBtn.addEventListener('click',runScan);
+tokenInput.addEventListener('keydown',e=>{if(e.key==='Enter')runScan();});
+
+async function runScan(){
+  const token=tokenInput.value.trim();
+  if(!token){tokenInput.focus();showToast('Enter a token first');return;}
+
+  scanBtn.disabled=true;
+  scanningEl.style.display='flex';
+  resultEl.style.display='none';
+  resetBtn.style.display='none';
+
+  try{
+    const res=await fetch('/api/scan',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token})
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Server error '+res.status);
+    lastResult={token,...data};
+    await renderResult(data);
+  }catch(err){
+    showToast(err.message||'Scan failed');
+    console.error(err);
+  }finally{
+    scanBtn.disabled=false;
+    scanningEl.style.display='none';
+  }
+}
+
+async function renderResult(d){
+  resultEl.style.display='block';
+  resetBtn.style.display='block';
+
+  const vEl=document.getElementById('verdict-text');
+  vEl.className='';
+  const st=getRoleStyle(d.verdict);
+  vEl.classList.add(st.cls,'pulsing');
+  vEl.textContent=d.verdictFull||d.verdict||'UNKNOWN';
+
+  setRing(d.confidence||75,st.ringColor);
+
+  [{id:'role',val:d.role,sub:d.roleSub},
+   {id:'timing',val:d.timing,sub:d.timingSub},
+   {id:'whale',val:d.whaleIntent,sub:d.whaleSub},
+   {id:'dev',val:d.devHistory,sub:d.devSub}]
+  .forEach(c=>{
+    const v=c.val||'—';
+    document.getElementById('stat-'+c.id).textContent=v;
+    document.getElementById('stat-'+c.id+'-sub').textContent=c.sub||'';
+    const card=document.getElementById('card-'+c.id);
+    const good=/clean|accumul|early|smart/i.test(v);
+    const bad=/rug|distribut|exit|late|serial|suspicious/i.test(v);
+    card.style.color=good?'var(--green)':bad?'var(--red)':'var(--amber)';
+  });
+
+  await typewrite(document.getElementById('sim-text'),d.simulation||'No simulation data.',16);
+}
+
+resetBtn.addEventListener('click',()=>{
+  resultEl.style.display='none';resetBtn.style.display='none';
+  tokenInput.value='';tokenInput.focus();
+});
+
+document.getElementById('share-btn').addEventListener('click',()=>{
+  if(!lastResult)return;
+  const txt=`EXIT LIQUIDITY DETECTOR\n\nToken: ${lastResult.token}\nVerdict: ${lastResult.verdictFull||lastResult.verdict}\nConfidence: ${lastResult.confidence}%\n\n${lastResult.shareText||''}`;
+  navigator.clipboard.writeText(txt).then(()=>showToast('Copied!')).catch(()=>showToast('Copy failed'));
+});
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
