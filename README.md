@@ -2,13 +2,13 @@
 
 > "market sentiment analysis."
 
-## Deploy to Vercel (5 minutes)
+## Deploy to VERCEL (5 minutes)
 
 ### 1. Prerequisites 
-- Anthropic API key:Obtain your API key from the anthropic console.
-- Environment Configuration:During your vercel deployment,navigate
+- Anthropic API key: Obtain your API key from the anthropic console.
+- ENVIRONMENT Configuration: During your vercel deployment,navigate
 to the project settings and add the following environmental variable:
-- ANTHROPIC_API_KEY:Paste your key (starts with `sk-ant-…`) to authorize analysis engine.
+- ANTHROPIC_API_KEY: Paste your key (starts with `sk-ant-…`) to authorize analysis engine.
 
 ### 2. Push to GitHub
 - Create a new repo at github.com
@@ -22,7 +22,7 @@ to the project settings and add the following environmental variable:
   └── vercel.json
   ```
 
-### 3. research prototype
+### 3.Deployment 
 - Go to https://vercel.com → **New Project**
 - Import your GitHub repo
 - Click **Environment Variables** and add:
