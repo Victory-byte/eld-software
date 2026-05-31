@@ -1,14 +1,14 @@
 # Exit Liquidity Detector
 
-> "This AI doesn't analyze coins. It tells you if you're the victim."
+> "market sentiment analysis."
 
 ## Deploy to Vercel (5 minutes)
 
-### 1. Get your Anthropic API key
-- Go to https://console.anthropic.com
-- Sign up / log in
-- Click **API Keys** → **Create Key**
-- Copy it (starts with `sk-ant-…`)
+### 1. Prerequisites 
+- Anthropic API key:Obtain your API key from the anthropic console.
+- Environment Configuration:During your vercel deployment,navigate
+to the project settings and add the following environmental variable:
+- ANTHROPIC_API_KEY:Paste your key (starts with `sk-ant-…`) to authorize analysis engine.
 
 ### 2. Push to GitHub
 - Create a new repo at github.com
@@ -22,7 +22,7 @@
   └── vercel.json
   ```
 
-### 3. Deploy on Vercel
+### 3. research prototype
 - Go to https://vercel.com → **New Project**
 - Import your GitHub repo
 - Click **Environment Variables** and add:
